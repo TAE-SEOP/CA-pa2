@@ -137,9 +137,150 @@ static inline bool strmatch(char * const str, const char *expect)
  */
 static int process_instruction(unsigned int instr)
 {
+	int ist; //0이면 i or j , 1이면 r
+	int rs, rt, rd, shamt, address;
+	unsigned int constant;
+	int num = 4;
+	int sign;
+	if ((instr >> 26) == 0) ist = 1;
+	else ist = 0;
+
+
+	if (ist == 1) {
+		rs = (instr << 6) >> 27;
+		rt = (instr << 11) >> 27;
+		rd = (instr << 16) >> 27;
+		shamt = (instr << 21) >> 27;
+		if (((instr << 26) >> 26) == 0x20) {  //add
+			registers[rd] = registers[rs] + registers[rt];
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x22) {  //sub
+			registers[rd] = registers[rs] - registers[rt];
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x24) {  //and
+			registers[rd] = registers[rs] & registers[rt];
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x25) {  //or
+			registers[rd] = registers[rs] | registers[rt];
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x27) {  //nor
+			registers[rd] = ~(registers[rs] | registers[rt]);
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x00) {  //sll
+			registers[rd] = registers[rt] << shamt;
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x02) {  //srl
+			registers[rd] = registers[rt] >> shamt;
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x03) {  //sra
+			registers[rd] = (int)registers[rt] >> shamt;
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x2a) {  //slt
+			if (registers[rs] < registers[rt]) registers[rd] = 1;
+			else registers[rd] = 0;
+			return 1;
+		}
+		else if (((instr << 26) >> 26) == 0x08) {  //jr
+			pc = registers[rs];
+			printf("xxxxxx\n");
+			return 1;
+		}
+	}
+
+	else {
+		if ((instr >> 26) == 0x3f) {
+			exit(0);
+		}
+		rs = (instr << 6) >> 27;
+		rt = (instr << 11) >> 27;
+
+		if ((instr << 16) >> 31 == 1) {  // addi, beq, bne 음수, 양수 구분
+			sign = 1;
+			constant = ((~(instr - 1) << 16) >> 16);
+		}
+		else {
+			sign = 0;
+			constant = (instr << 16) >> 16;
+
+		}
+		address = (instr << 6) >> 6;
+
+
+
+		if ((instr >> 26) == 0x08) {  //addi
+			if (sign == 0) registers[rt] = registers[rs] + constant;
+			else  registers[rt] = registers[rs] - constant;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x04) {  //beq
+			if (sign == 1) {
+				if (registers[rt] == registers[rs]) pc = pc - constant * 4;
+			}
+			else {
+				if (registers[rt] == registers[rs]) pc = pc + constant * 4;
+			}
+			return 1;
+		}
+		else if ((instr >> 26) == 0x05) {  //bne
+			if (sign == 1) {
+				if (registers[rt] != registers[rs]) pc = pc - constant * 4;
+			}
+			else {
+				if (registers[rt] != registers[rs]) pc = pc + constant * 4;
+			}
+			return 1;
+		}
+
+		constant = (instr << 16) >> 16;
+
+
+		if ((instr >> 26) == 0x0c) {  //andi
+			registers[rt] = registers[rs] & constant;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x0d) {  //ori
+			registers[rt] = registers[rs] | constant;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x23) {  //lw
+			registers[rt] = (memory[registers[rs] + constant] << 24)
+				+ (memory[registers[rs] + constant + 1] << 16)
+				+ (memory[registers[rs] + constant + 2] << 8)
+				+ (memory[registers[rs] + constant + 3]);
+			return 1;
+		}
+		else if ((instr >> 26) == 0x2b) {  //sw
+			memory[registers[rs] + constant] = registers[rt] >> 24;
+			memory[registers[rs] + constant + 1] = (registers[rt] << 8) >> 24;
+			memory[registers[rs] + constant + 2] = (registers[rt] << 16) >> 24;
+			memory[registers[rs] + constant + 3] = (registers[rt] << 24) >> 24;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x0a) {  //slti
+			if (registers[rs] < (int)constant) registers[rt] = 1;
+			else registers[rt] = 0;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x02) {  //j
+			pc = address * 4;
+			return 1;
+		}
+		else if ((instr >> 26) == 0x03) {  //jal
+			registers[31] = pc;
+			pc = address * 4;
+			return 1;
+		}
+	}
 	return 0;
 }
-
 
 /**********************************************************************
  * load_program
