@@ -315,6 +315,36 @@ static int process_instruction(unsigned int instr)
 
 static int load_program(char * const filename)
 {
+
+	char file[256] = { '\0' };
+	char command2[MAX_COMMAND] = { '\0' };
+	int i = 0x00001000;
+
+	FILE *load = stdin;
+	load = fopen(filename, "r");
+	if (!load) {
+		fprintf(stderr, "x  %s\n", filename);
+		return -EINVAL;
+	}
+
+
+	while (fgets(command2, sizeof(command2), load) != NULL) {
+
+		unsigned int instr2 = strtoimax(command2, NULL, 0);
+		memory[i] = (instr2 >> 24);
+		memory[i + 1] = ((instr2 << 8) >> 24);
+		memory[i + 2] = ((instr2 << 16) >> 24);
+		memory[i + 3] = ((instr2 << 24) >> 24);
+
+		i += 4;
+	}
+
+	memory[i] = 0xff;
+	memory[i + 1] = 0xff;
+	memory[i + 2] = 0xff;
+	memory[i + 3] = 0xff;
+
+
 	return -EINVAL;
 }
 
@@ -339,7 +369,17 @@ static int load_program(char * const filename)
 static int run_program(void)
 {
 	pc = INITIAL_PC;
+	int instr3;
+	while (true) {
+		if (memory[pc] == 0xff && memory[pc + 1] == 0xff && memory[pc + 2] == 0xff && memory[pc + 3] == 0xff) {
+			break;
+		}
+		instr3 = (memory[pc] << 24) + (memory[pc + 1] << 16) + (memory[pc + 2] << 8) + (memory[pc + 3]);
+		pc += 4;
+		if (process_instruction(instr3) == 0) break;
 
+	}
+	pc += 4;
 	return 0;
 }
 
